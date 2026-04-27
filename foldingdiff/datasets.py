@@ -25,8 +25,8 @@ LOCAL_DATA_DIR = Path(
     os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
 )
 
-CATH_DIR = LOCAL_DATA_DIR / "cath"
-ALPHAFOLD_DIR = LOCAL_DATA_DIR / "alphafold"
+CATH_DIR = LOCAL_DATA_DIR 
+ALPHAFOLD_DIR = LOCAL_DATA_DIR 
 
 
 from foldingdiff import beta_schedules
