@@ -180,8 +180,32 @@ class BertForSSConditionedDiffusion(BertForDiffusion):
             checkpoint_path = os.path.join(checkpoint_path, "epoch_final.ckpt")
 
         state = torch.load(checkpoint_path, map_location="cpu")
-        state_dict = state.get("state_dict", state)
+        state_dict = dict(state.get("state_dict", state))
+
+        # Expand the parent's Linear(n_angle_features, hidden) input projection
+        # into our Linear(n_angle_features + 1, hidden): copy the pretrained
+        # weights into the angle columns, zero the new is_motif column. This
+        # makes the augmented model bit-identical to the base model at init
+        # (given small ss_embedding init), so a frozen encoder gets the same
+        # input distribution it was pretrained on.
+        w_key = "inputs_to_hidden_dim.weight"
+        b_key = "inputs_to_hidden_dim.bias"
+        if w_key in state_dict:
+            old_W = state_dict[w_key]                  # (hidden, n_angle_features)
+            new_W = torch.zeros_like(self.inputs_to_hidden_dim.weight)
+            if old_W.shape[1] != self.n_angle_features:
+                raise ValueError(
+                    f"Pretrained {w_key} has {old_W.shape[1]} input channels, "
+                    f"expected {self.n_angle_features}."
+                )
+            new_W[:, : self.n_angle_features].copy_(old_W)
+            # last column (is_motif) stays zero
+            state_dict[w_key] = new_W
+        if b_key in state_dict:
+            state_dict[b_key] = state_dict[b_key].clone()
+
         missing, unexpected = self.load_state_dict(state_dict, strict=False)
+        # ss_embedding.* is expected to be missing (new module).
         logging.info(
             f"Loaded pretrained base weights from {checkpoint_path}. "
             f"Missing keys: {missing}. Unexpected keys: {unexpected}."
