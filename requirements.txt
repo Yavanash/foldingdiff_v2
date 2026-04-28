@@ -12,3 +12,5 @@ astropy
 gitpython
 biotite==0.34
 requests
+
+# python==3.9.25

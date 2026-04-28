@@ -42,10 +42,14 @@ from __future__ import annotations
 
 import inspect
 import logging
+import os
+from pathlib import Path
 from typing import List, Optional
 
+import pytorch_lightning as pl
 import torch
 from torch import nn
+from transformers.optimization import get_linear_schedule_with_warmup
 
 from foldingdiff.modelling import BertForDiffusion
 
@@ -74,6 +78,8 @@ class BertForSSConditionedDiffusion(BertForDiffusion):
         ss_vocab_size: int = SS_VOCAB_SIZE,
         ft_is_angular: Optional[List[bool]] = None,
         ft_names: Optional[List[str]] = None,
+        pretrained_checkpoint: Optional[str] = None,
+        freeze_pretrained: bool = False,
         **kwargs,
     ) -> None:
         if ft_is_angular is None:
@@ -106,11 +112,18 @@ class BertForSSConditionedDiffusion(BertForDiffusion):
         self._phi_idx = ft_names.index("phi")
         self._psi_idx = ft_names.index("psi")
 
+        if pretrained_checkpoint is not None:
+            self._load_pretrained_base_weights(pretrained_checkpoint)
+
+        if freeze_pretrained:
+            self._freeze_pretrained_weights()
+
         logging.info(
             f"BertForSSConditionedDiffusion: "
             f"n_aug_features={self.n_aug_features}, "
             f"n_angle_features={self.n_angle_features}, "
-            f"rama_lambda={self.rama_lambda}, ss_vocab_size={ss_vocab_size}"
+            f"rama_lambda={self.rama_lambda}, ss_vocab_size={ss_vocab_size}, "
+            f"freeze_pretrained={freeze_pretrained}"
         )
 
     # ---------- forward ----------
@@ -161,6 +174,62 @@ class BertForSSConditionedDiffusion(BertForDiffusion):
         encoder_outputs = self.encoder(h, attention_mask=ext_attn, return_dict=True)
         sequence_output = encoder_outputs.last_hidden_state
         return self.token_decoder(sequence_output)
+
+    def _load_pretrained_base_weights(self, checkpoint_path: str) -> None:
+        if os.path.isdir(checkpoint_path):
+            checkpoint_path = os.path.join(checkpoint_path, "epoch_final.ckpt")
+
+        state = torch.load(checkpoint_path, map_location="cpu")
+        state_dict = state.get("state_dict", state)
+        missing, unexpected = self.load_state_dict(state_dict, strict=False)
+        logging.info(
+            f"Loaded pretrained base weights from {checkpoint_path}. "
+            f"Missing keys: {missing}. Unexpected keys: {unexpected}."
+        )
+
+    def _freeze_pretrained_weights(self) -> None:
+        for name, param in self.named_parameters():
+            if not (name.startswith("inputs_to_hidden_dim") or name.startswith("ss_embedding")):
+                param.requires_grad = False
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.AdamW(
+            filter(lambda p: p.requires_grad, self.parameters()),
+            lr=self.learning_rate,
+            weight_decay=self.l2_lambda,
+        )
+        retval = {"optimizer": optimizer}
+        if self.lr_scheduler:
+            if self.lr_scheduler == "OneCycleLR":
+                retval["lr_scheduler"] = {
+                    "scheduler": torch.optim.lr_scheduler.OneCycleLR(
+                        optimizer,
+                        max_lr=1e-2,
+                        epochs=self.epochs,
+                        steps_per_epoch=self.steps_per_epoch,
+                    ),
+                    "monitor": "val_loss",
+                    "frequency": 1,
+                    "interval": "step",
+                }
+            elif self.lr_scheduler == "LinearWarmup":
+                warmup_steps = int(self.epochs * 0.1)
+                pl.utilities.rank_zero_info(
+                    f"Using linear warmup with {warmup_steps}/{self.epochs} warmup steps"
+                )
+                retval["lr_scheduler"] = {
+                    "scheduler": get_linear_schedule_with_warmup(
+                        optimizer,
+                        num_warmup_steps=warmup_steps,
+                        num_training_steps=self.epochs,
+                    ),
+                    "frequency": 1,
+                    "interval": "epoch",
+                }
+            else:
+                raise ValueError(f"Unknown lr scheduler {self.lr_scheduler}")
+        pl.utilities.rank_zero_info(f"Using optimizer {retval}")
+        return retval
 
     # ---------- loss ----------
 

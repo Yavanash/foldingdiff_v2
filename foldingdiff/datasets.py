@@ -245,7 +245,7 @@ class CathCanonicalAnglesDataset(Dataset):
         elif Path(pdbs).is_dir():
             fnames = []
             for ext in [".pdb", ".pdb.gz"]:
-                fnames.extend(glob.glob(os.path.join(pdbs, f"*{ext}")))
+                fnames.extend(glob.glob(os.path.join(pdbs, f"*")))
             assert fnames, f"No PDB files found in {pdbs}"
             logging.info(f"Found {len(fnames)} PDB files in {pdbs}")
         else:  # Should be a keyword

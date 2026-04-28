@@ -106,6 +106,8 @@ def build_model(args, steps_per_epoch: int) -> BertForSSConditionedDiffusion:
         epochs=args.epochs,
         steps_per_epoch=steps_per_epoch,
         lr_scheduler=args.lr_scheduler,
+        pretrained_checkpoint=args.pretrained_checkpoint,
+        freeze_pretrained=args.freeze_pretrained,
     )
 
 
@@ -133,6 +135,8 @@ def main():
     p.add_argument("--l2", type=float, default=0.0)
     p.add_argument("--l1", type=float, default=0.0)
     p.add_argument("--circle-reg", type=float, default=0.0)
+    p.add_argument("--pretrained-checkpoint", default=None)
+    p.add_argument("--freeze-pretrained", action="store_true")
     p.add_argument("--batch-size", type=int, default=64)
     p.add_argument("--num-workers", type=int, default=4)
     p.add_argument("--epochs", type=int, default=100)
