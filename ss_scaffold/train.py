@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import json
 import os
 from pathlib import Path
 
@@ -170,6 +171,18 @@ def main():
 
     steps_per_epoch = max(1, len(train_loader))
     model = build_model(args, steps_per_epoch)
+
+    # Write artifacts that from_dir (used by sample.py) needs.
+    model.config.save_pretrained(out_dir)
+    training_args = {
+        "angles_definitions": "canonical-full-angles",
+        "time_encoding": args.time_encoding,
+        "decoder": args.decoder,
+        "rama_lambda": args.rama_lambda,
+        "ft_names": ["phi", "psi", "omega", "tau", "CA:C:1N", "C:1N:1CA"],
+    }
+    with open(out_dir / "training_args.json", "w") as f:
+        json.dump(training_args, f, indent=2)
 
     callbacks = [
         pl.callbacks.ModelCheckpoint(

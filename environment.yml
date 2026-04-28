@@ -20,5 +20,5 @@ dependencies:
   - conda-forge::gitpython
   - conda-forge::biotite=0.34
   - conda-forge::scikit-learn=1.2.1
-  - bioconda::tmalign
+  # - bioconda::tmalign
   - conda-forge::requests
