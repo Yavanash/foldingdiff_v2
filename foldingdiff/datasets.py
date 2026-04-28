@@ -311,16 +311,21 @@ class CathCanonicalAnglesDataset(Dataset):
             angles=EXHAUSTIVE_ANGLES,
         )
         coords_pfunc = functools.partial(extract_backbone_coords, atoms=["CA"])
+        n_workers = int(os.environ.get("FOLDINGDIFF_WORKERS", multiprocessing.cpu_count()))
 
         logging.info(
-            f"Computing full dataset of {len(fnames)} with {multiprocessing.cpu_count()} threads"
+            f"Computing full dataset of {len(fnames)} with {n_workers} threads"
         )
         # Generate dihedral angles
-        pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
-        struct_arrays = list(pool.map(pfunc, fnames, chunksize=250))
-        coord_arrays = list(pool.map(coords_pfunc, fnames, chunksize=250))
-        pool.close()
-        pool.join()
+        if n_workers <= 1: 
+            struct_arrays = [pfunc(f) for f in fnames]
+            coord_arrays = [coords_pfunc(f) for f in fnames]
+        else:
+            pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
+            struct_arrays = list(pool.map(pfunc, fnames, chunksize=250))
+            coord_arrays = list(pool.map(coords_pfunc, fnames, chunksize=250))
+            pool.close()
+            pool.join()
 
         # Contains only non-null structures
         structures = []

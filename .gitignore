@@ -9,3 +9,4 @@ config_jsons/
 foldingdiff/cache_canonical_structures_cath_d3565295b6bd304c8ecc27c1f34bc194.pkl
 .pkl
 runs/
+generated/

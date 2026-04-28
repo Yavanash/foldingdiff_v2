@@ -283,6 +283,9 @@ def extract_backbone_coords(
     chain = structure.get_structure()[0]
     backbone = chain[struc.filter_backbone(chain)]
     ca = [c for c in backbone if c.atom_name in atoms]
+    if len(ca) == 0:
+        logging.warning(f"{fname} has no {atoms}")
+        return None
     coords = np.vstack([c.coord for c in ca])
     return coords
 
