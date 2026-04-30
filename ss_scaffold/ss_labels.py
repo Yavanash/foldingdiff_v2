@@ -93,6 +93,7 @@ def sample_motif_span(
     p_no_motif: float = 0.3,
     mode: str = "ss_run",
     max_len: Optional[int] = None,
+    max_flank: int = 10,
     rng: Optional[random.Random] = None,
 ) -> Optional[Tuple[int, int, str]]:
     """
@@ -104,9 +105,14 @@ def sample_motif_span(
       - "arbitrary_span": pick an arbitrary contiguous span [s, e) of length
         in [min_len, max_len]. ss_class is the *majority* DSSP class of the
         span (purely descriptive; the model reads per-residue ss_labels).
-      - "mixed": with prob 0.5 use "ss_run", else "arbitrary_span". Trains the
-        model on both single-SS motifs and mixed-SS chunks (the inference case
-        when the user passes an arbitrary input PDB).
+      - "flanks": sample (k_left, k_right) uniformly in [0, max_flank], set
+        motif = [k_left, seq_len - k_right]. Mirrors the canonical inference
+        case where the user gives a whole PDB and wants a few extra residues
+        added at each end. Falls back to None if the resulting motif is
+        shorter than min_len.
+      - "mixed": uniformly pick among {"ss_run", "arbitrary_span", "flanks"}.
+        Trains the model on single-SS motifs, mixed-SS chunks, AND the
+        whole-protein-as-motif regime — covering the full inference range.
 
     Returns None with probability p_no_motif so the model keeps an
     unconditional path. Spans are bounded by seq_len.
@@ -116,7 +122,7 @@ def sample_motif_span(
         return None
 
     if mode == "mixed":
-        mode = "ss_run" if rng.random() < 0.5 else "arbitrary_span"
+        mode = rng.choice(["ss_run", "arbitrary_span", "flanks"])
 
     if mode == "ss_run":
         candidates: List[Tuple[int, int, str]] = []
@@ -137,6 +143,23 @@ def sample_motif_span(
         start = rng.randint(0, seq_len - span_len)
         end = start + span_len
         # Majority class is descriptive only; model uses per-residue ss_labels.
+        sub = ss_string[start:end]
+        majority = max("HEC", key=lambda c: sub.count(c))
+        return (start, end, majority)
+
+    if mode == "flanks":
+        if seq_len < min_len:
+            return None
+        # Cap each flank so motif length stays >= min_len even at worst case.
+        upper_flank = max(0, min(max_flank, (seq_len - min_len) // 2))
+        if upper_flank < 0:
+            return None
+        k_left = rng.randint(0, upper_flank)
+        k_right = rng.randint(0, upper_flank)
+        start = k_left
+        end = seq_len - k_right
+        if end - start < min_len:
+            return None
         sub = ss_string[start:end]
         majority = max("HEC", key=lambda c: sub.count(c))
         return (start, end, majority)

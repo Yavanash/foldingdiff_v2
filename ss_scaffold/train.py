@@ -76,6 +76,7 @@ def build_datasets(args):
         motif_mode=args.motif_mode,
         motif_min_len=args.motif_min_len,
         motif_max_len=args.motif_max_len,
+        motif_max_flank=args.motif_max_flank,
         p_no_motif=args.p_no_motif,
     )
     val_dset = SSAnnotatedAnglesDataset(
@@ -85,6 +86,7 @@ def build_datasets(args):
         motif_mode=args.motif_mode,
         motif_min_len=args.motif_min_len,
         motif_max_len=args.motif_max_len,
+        motif_max_flank=args.motif_max_flank,
         p_no_motif=args.p_no_motif,
     )
     return train_dset, val_dset, base_train.get_masked_means()
@@ -133,12 +135,16 @@ def main():
     p.add_argument("--angular-variance", type=float, default=1.0)
     p.add_argument("--p-no-motif", type=float, default=0.3)
     p.add_argument("--motif-mode", default="mixed",
-                   choices=["ss_run", "arbitrary_span", "mixed"],
+                   choices=["ss_run", "arbitrary_span", "flanks", "mixed"],
                    help="ss_run = legacy single-class motif; arbitrary_span = "
-                        "any contiguous chunk (matches inference on arbitrary "
-                        "input PDBs); mixed = 50/50 of both.")
+                        "any contiguous chunk; flanks = motif covers the "
+                        "middle, small flanks at each end (matches the "
+                        "inference 'extend a PDB by a few residues' case); "
+                        "mixed = uniform over the three.")
     p.add_argument("--motif-min-len", type=int, default=6)
     p.add_argument("--motif-max-len", type=int, default=None)
+    p.add_argument("--motif-max-flank", type=int, default=10,
+                   help="Max residues at each end in 'flanks' mode.")
     p.add_argument("--hidden-size", type=int, default=384)
     p.add_argument("--intermediate-size", type=int, default=None)
     p.add_argument("--position-embedding-type", default="relative_key",
@@ -199,6 +205,14 @@ def main():
         "decoder": args.decoder,
         "rama_lambda": args.rama_lambda,
         "ft_names": ["phi", "psi", "omega", "tau", "CA:C:1N", "C:1N:1CA"],
+        # Motif-conditioning regime the model was trained under. Surfaced so
+        # sampling/eval can introspect what (motif_mask, ss_label) combinations
+        # are in-distribution.
+        "motif_mode": args.motif_mode,
+        "motif_min_len": args.motif_min_len,
+        "motif_max_len": args.motif_max_len,
+        "motif_max_flank": args.motif_max_flank,
+        "p_no_motif": args.p_no_motif,
     }
     with open(out_dir / "training_args.json", "w") as f:
         json.dump(training_args, f, indent=2)

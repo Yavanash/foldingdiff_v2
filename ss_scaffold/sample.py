@@ -57,14 +57,26 @@ def _parse_range(s: str) -> Tuple[int, int]:
 
 
 def _extract_motif_angles(pdb_path: str, start: int, end: int) -> np.ndarray:
-    """Extract the 6 backbone angles for residues [start:end] from a PDB."""
+    """Extract the 6 backbone angles for residues [start:end] from a PDB.
+
+    biotite's dihedral_backbone leaves residue 0's phi and the last residue's
+    psi/omega as NaN (biophysically undefined). Training cleans these via
+    np.nan_to_num at foldingdiff/datasets.py; mirror that here so the RePaint
+    clamp doesn't inject NaN through the diffusion loop.
+    """
     df = canonical_distances_and_dihedrals(pdb_path, angles=ANGLE_NAMES)
     if df is None or len(df) < end:
         raise ValueError(
             f"Could not extract angles {start}:{end} from {pdb_path} "
             f"(got {0 if df is None else len(df)} residues)"
         )
-    return df.iloc[start:end][ANGLE_NAMES].to_numpy(dtype=np.float32)
+    arr = df.iloc[start:end][ANGLE_NAMES].to_numpy(dtype=np.float32)
+    n_nan = int(np.isnan(arr).sum())
+    if n_nan:
+        logging.info(f"Replacing {n_nan} NaN entries in motif angles with 0.0 "
+                     f"(boundary residues — phi[0], psi[-1], omega[-1])")
+        arr = np.nan_to_num(arr, nan=0.0)
+    return arr
 
 
 def _build_ss_string(
