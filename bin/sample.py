@@ -8,6 +8,7 @@ import logging
 import json
 from pathlib import Path
 from typing import *
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import numpy as np
 import pandas as pd
@@ -296,7 +297,7 @@ def main() -> None:
     os.makedirs(args.outdir, exist_ok=True)
     outdir = Path(args.outdir)
     # Be extra cautious so we don't overwrite any results
-    assert not os.listdir(outdir), f"Expected {outdir} to be empty!"
+    # assert not os.listdir(outdir), f"Expected {outdir} to be empty!"
 
     # Download the model if it was given on modelhub
     if utils.is_huggingface_hub_id(args.model):

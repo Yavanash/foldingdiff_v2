@@ -39,6 +39,7 @@ def build_datasets(args):
         split="train",
         pad=args.pad,
         trim_strategy=args.trim_strategy,
+        min_length=0,  # Disable min_length filter for short sequences
     )
     base_val = CathCanonicalAnglesOnlyDataset(
         pdbs=args.pdb_dir,
@@ -46,6 +47,7 @@ def build_datasets(args):
         pad=args.pad,
         trim_strategy=args.trim_strategy,
         zero_center=True,
+        min_length=0,  # Disable min_length filter for short sequences
     )
     base_val.set_masked_means(base_train.get_masked_means())
 

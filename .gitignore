@@ -24,3 +24,5 @@ runs/
 generated/
 key
 key.pub
+checking/
+*.pkl

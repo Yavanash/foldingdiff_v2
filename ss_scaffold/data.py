@@ -15,7 +15,7 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-DEFAULT_MAX_STRUCTURES = 50
+DEFAULT_MAX_STRUCTURES = 500
 DEFAULT_MIN_HELIX_LEN  = 7
 DEFAULT_MIN_HELIX_FRAC = 0.50
 OUTPUT_DIR             = Path("../data/output_helices")
