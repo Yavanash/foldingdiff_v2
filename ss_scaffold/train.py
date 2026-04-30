@@ -19,6 +19,7 @@ import json
 import os
 from pathlib import Path
 
+import numpy as np
 import pytorch_lightning as pl
 import torch
 from torch.utils.data import DataLoader
@@ -80,7 +81,7 @@ def build_datasets(args):
         cache_dir=args.cache_dir,
         p_no_motif=args.p_no_motif,
     )
-    return train_dset, val_dset
+    return train_dset, val_dset, base_train.get_masked_means()
 
 
 def build_model(args, steps_per_epoch: int) -> BertForSSConditionedDiffusion:
@@ -155,7 +156,10 @@ def main():
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    train_dset, val_dset = build_datasets(args)
+    train_dset, val_dset, training_means = build_datasets(args)
+    if training_means is not None:
+        np.save(out_dir / "training_means.npy", training_means)
+        logging.info(f"Saved training_means.npy with shape {training_means.shape}: {training_means}")
     train_loader = DataLoader(
         train_dset,
         batch_size=args.batch_size,

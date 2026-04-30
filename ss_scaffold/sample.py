@@ -110,6 +110,23 @@ def main():
     logging.info(f"Extracting motif from {args.motif_pdb}: residues {motif_start_src}-{motif_end_src}")
     motif_angles_np = _extract_motif_angles(args.motif_pdb, motif_start_src, motif_end_src)
 
+    means_path = Path(args.model_dir) / "training_means.npy"
+    if means_path.exists():
+        training_means = np.load(means_path).astype(np.float32)
+        assert training_means.shape == (len(ANGLE_NAMES),), (
+            f"training_means shape {training_means.shape} != ({len(ANGLE_NAMES)},)"
+        )
+        logging.info(f"Loaded training_means: {training_means}")
+        motif_angles_np = utils.modulo_with_wrapped_range(
+            motif_angles_np - training_means, range_min=-np.pi, range_max=np.pi
+        )
+    else:
+        training_means = None
+        logging.warning(
+            f"No training_means.npy found at {means_path}; sampling in raw angle space. "
+            "If the model was trained with zero_center=True, outputs will be biased."
+        )
+
     # Optional: verify the motif is actually the requested class via DSSP.
     try:
         ss_src = dssp_three_state(args.motif_pdb)
@@ -163,6 +180,11 @@ def main():
         is_angle=IS_ANGLE,
     )
     final = sampled[-1].numpy()  # (B, L, n_features)
+
+    if training_means is not None:
+        final = utils.modulo_with_wrapped_range(
+            final + training_means, range_min=-np.pi, range_max=np.pi
+        )
 
     # Save per-sample CSV (angles) and reconstruct PDBs via NeRF.
     meta = {
