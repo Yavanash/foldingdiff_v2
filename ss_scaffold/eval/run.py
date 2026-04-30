@@ -40,10 +40,12 @@ import pandas as pd
 from ss_scaffold.eval import diversity, esmfold, metrics, mpnn
 
 
-def _build_ss_string(L: int, motif_start: int, motif_end: int, motif_class: str) -> str:
-    chars = ["C"] * L
-    for i in range(motif_start, motif_end):
-        chars[i] = motif_class
+def _build_ss_string(
+    L: int, motif_start: int, motif_end: int, motif_ss: str, flank_ss: str = "C"
+) -> str:
+    chars = [flank_ss] * L
+    for i, c in enumerate(motif_ss):
+        chars[motif_start + i] = c
     return "".join(chars)
 
 
@@ -89,8 +91,17 @@ def main():
     if meta is not None:
         ms, me = meta["motif_target"]
         motif_residues = list(range(ms, me))
-        requested_ss = _build_ss_string(meta["total_length"], ms, me, meta["motif_class"])
-        logging.info(f"Motif residues {ms}-{me}; SS class {meta['motif_class']}")
+        # New metadata schema: motif_ss is per-residue. Fall back to old
+        # motif_class field for compatibility with checkpoints generated
+        # before sample.py was generalized.
+        if "motif_ss" in meta:
+            motif_ss = meta["motif_ss"]
+            flank_ss = meta.get("flank_ss", "C")
+        else:
+            motif_ss = meta["motif_class"] * (me - ms)
+            flank_ss = "C"
+        requested_ss = _build_ss_string(meta["total_length"], ms, me, motif_ss, flank_ss)
+        logging.info(f"Motif residues {ms}-{me}; motif_ss={motif_ss} flank={flank_ss}")
 
     folder = esmfold.ESMFoldRunner(device=args.device, chunk_size=args.esm_chunk_size)
 
