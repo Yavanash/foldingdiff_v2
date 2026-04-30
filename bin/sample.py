@@ -246,7 +246,7 @@ def build_parser() -> argparse.ArgumentParser:
         "-m",
         "--model",
         type=str,
-        default="wukevin/foldingdiff_cath",
+        default="config_jsons/",
         help="Path to model directory, or a repo identifier on huggingface hub. Should contain training_args.json, config.json, and models folder at a minimum.",
     )
     parser.add_argument(

@@ -345,7 +345,7 @@ class BertForDiffusionBase(BertPreTrainedModel):
             )
             subfolder = f"best_by_{best_by}"
             # Sort checkpoints by epoch -- last item is latest epoch
-            ckpt_name = "/home/shinju/305_proj/foldingdiff_v2/config_jsons/epoch.ckpt"
+            ckpt_name = os.path.join(dirname, "epoch.ckpt")
             logging.info(f"Loading weights from {ckpt_name}")
             if hasattr(cls, "load_from_checkpoint"):
                 # Defined for pytorch lightning module
