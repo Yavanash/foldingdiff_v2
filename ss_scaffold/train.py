@@ -73,12 +73,18 @@ def build_datasets(args):
         wrapped=noised_train,
         pdb_dir=args.pdb_dir,
         cache_dir=args.cache_dir,
+        motif_mode=args.motif_mode,
+        motif_min_len=args.motif_min_len,
+        motif_max_len=args.motif_max_len,
         p_no_motif=args.p_no_motif,
     )
     val_dset = SSAnnotatedAnglesDataset(
         wrapped=noised_val,
         pdb_dir=args.pdb_dir,
         cache_dir=args.cache_dir,
+        motif_mode=args.motif_mode,
+        motif_min_len=args.motif_min_len,
+        motif_max_len=args.motif_max_len,
         p_no_motif=args.p_no_motif,
     )
     return train_dset, val_dset, base_train.get_masked_means()
@@ -126,6 +132,13 @@ def main():
     p.add_argument("--beta-schedule", default="cosine")
     p.add_argument("--angular-variance", type=float, default=1.0)
     p.add_argument("--p-no-motif", type=float, default=0.3)
+    p.add_argument("--motif-mode", default="mixed",
+                   choices=["ss_run", "arbitrary_span", "mixed"],
+                   help="ss_run = legacy single-class motif; arbitrary_span = "
+                        "any contiguous chunk (matches inference on arbitrary "
+                        "input PDBs); mixed = 50/50 of both.")
+    p.add_argument("--motif-min-len", type=int, default=6)
+    p.add_argument("--motif-max-len", type=int, default=None)
     p.add_argument("--hidden-size", type=int, default=384)
     p.add_argument("--intermediate-size", type=int, default=None)
     p.add_argument("--position-embedding-type", default="relative_key",

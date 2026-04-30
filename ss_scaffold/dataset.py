@@ -65,11 +65,15 @@ class SSAnnotatedAnglesDataset(Dataset):
         cache_dir: Optional[str] = None,
         motif_classes: Tuple[str, ...] = ("H", "E"),
         motif_min_len: int = 6,
+        motif_max_len: Optional[int] = None,
+        motif_mode: str = "mixed",
         p_no_motif: float = 0.3,
         seed: int = 0,
     ) -> None:
         super().__init__()
         self.wrapped = wrapped
+        self.motif_mode = motif_mode
+        self.motif_max_len = motif_max_len
         # Reach through the noiser to find the underlying angles dataset so we
         # can align SS labels with the residue order it uses.
         inner = wrapped.dset
@@ -145,6 +149,8 @@ class SSAnnotatedAnglesDataset(Dataset):
             seq_len=seq_len,
             classes=self.motif_classes,
             min_len=self.motif_min_len,
+            max_len=self.motif_max_len,
+            mode=self.motif_mode,
             p_no_motif=self.p_no_motif,
         )
         motif_mask = motif_mask_from_span(span, pad_len=pad)

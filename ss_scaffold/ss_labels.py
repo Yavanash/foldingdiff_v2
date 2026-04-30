@@ -91,31 +91,57 @@ def sample_motif_span(
     classes: Tuple[str, ...] = ("H", "E"),
     min_len: int = 6,
     p_no_motif: float = 0.3,
+    mode: str = "ss_run",
+    max_len: Optional[int] = None,
     rng: Optional[random.Random] = None,
 ) -> Optional[Tuple[int, int, str]]:
     """
-    Sample a motif span (start, end, ss_class) from the SS string for one
-    training example. Returns None with probability p_no_motif (so the model
-    keeps an unconditional path).
+    Sample a motif span (start, end, ss_class) from the SS string.
 
-    Selection rule: pick a random eligible run from the union of runs across
-    all `classes`. If no eligible runs exist, return None (acts like no-motif).
+    Modes:
+      - "ss_run": pick a random contiguous run of one of `classes` whose length
+        is >= min_len. ss_class is that class's letter (legacy behavior).
+      - "arbitrary_span": pick an arbitrary contiguous span [s, e) of length
+        in [min_len, max_len]. ss_class is the *majority* DSSP class of the
+        span (purely descriptive; the model reads per-residue ss_labels).
+      - "mixed": with prob 0.5 use "ss_run", else "arbitrary_span". Trains the
+        model on both single-SS motifs and mixed-SS chunks (the inference case
+        when the user passes an arbitrary input PDB).
 
-    The returned span is bounded by seq_len so callers don't index past
-    valid residues.
+    Returns None with probability p_no_motif so the model keeps an
+    unconditional path. Spans are bounded by seq_len.
     """
     rng = rng or random
     if rng.random() < p_no_motif:
         return None
 
-    candidates: List[Tuple[int, int, str]] = []
-    for cls in classes:
-        for s, e in find_ss_runs(ss_string[:seq_len], cls, min_len=min_len):
-            candidates.append((s, e, cls))
+    if mode == "mixed":
+        mode = "ss_run" if rng.random() < 0.5 else "arbitrary_span"
 
-    if not candidates:
-        return None
-    return rng.choice(candidates)
+    if mode == "ss_run":
+        candidates: List[Tuple[int, int, str]] = []
+        for cls in classes:
+            for s, e in find_ss_runs(ss_string[:seq_len], cls, min_len=min_len):
+                candidates.append((s, e, cls))
+        if not candidates:
+            return None
+        return rng.choice(candidates)
+
+    if mode == "arbitrary_span":
+        if seq_len < min_len:
+            return None
+        upper = seq_len if max_len is None else min(max_len, seq_len)
+        if upper < min_len:
+            return None
+        span_len = rng.randint(min_len, upper)
+        start = rng.randint(0, seq_len - span_len)
+        end = start + span_len
+        # Majority class is descriptive only; model uses per-residue ss_labels.
+        sub = ss_string[start:end]
+        majority = max("HEC", key=lambda c: sub.count(c))
+        return (start, end, majority)
+
+    raise ValueError(f"Unknown sample_motif_span mode: {mode!r}")
 
 
 def motif_mask_from_span(
