@@ -26,3 +26,7 @@ key
 key.pub
 checking/
 *.pkl
+.vscode/
+# generated_mixed/
+hf/
+pyproject.toml

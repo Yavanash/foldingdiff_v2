@@ -1,24 +1,31 @@
 name: foldingdiff
 channels:
-  - defaults
-  - anaconda
   - pytorch
   - conda-forge
-  - huggingface
+  - defaults
 dependencies:
   - python=3.8
+  - pytorch=1.12
+  - numpy=1.22.3
+  - pandas~=1.1.5
+  - scikit-learn=1.2.1
+  - biotite=0.34
+  - astropy=5.1
+  - pytorch-lightning=1.6.4
+  - transformers=4.11.3
+  - huggingface_hub
+  - gitpython
+  - seaborn
+  - requests
+  - mpl-scatter-density
+  - dssp
+  - libboost=1.73
   - pip
-  - anaconda::numpy=1.22.3
-  - conda-forge::pandas~=1.1.5
-  - pytorch::pytorch=1.12
-  - huggingface::transformers=4.11.3
-  - conda-forge::pytorch-lightning=1.6.4
-  - conda-forge::huggingface_hub
-  - conda-forge::seaborn
-  - conda-forge::mpl-scatter-density
-  - conda-forge::astropy=5.1
-  - conda-forge::gitpython
-  - conda-forge::biotite=0.34
-  - conda-forge::scikit-learn=1.2.1
-  # - bioconda::tmalign
-  - conda-forge::requests
+  - pip:
+      - fair-esm==2.0.0
+      - biopython==1.83
+      - omegaconf==2.3.0
+      - torchmetrics==1.4.0.post0
+      - sacremoses==0.0.43
+      - statsmodels==0.14.0
+      - fast-histogram==0.9

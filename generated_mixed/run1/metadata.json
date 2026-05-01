@@ -1,0 +1,17 @@
+{
+  "model_dir": "runs/ss_scaffold_v2",
+  "motif_pdb": "data/1A0F_chainB_res119-140_alpha.pdb",
+  "motif_range": [
+    3,
+    21
+  ],
+  "motif_ss": "HHHHHHHHHHHHHHHHHH",
+  "flank_ss": "C",
+  "motif_class_override": "H",
+  "motif_target": [
+    3,
+    21
+  ],
+  "total_length": 100,
+  "n_samples": 4
+}

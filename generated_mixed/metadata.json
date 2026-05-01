@@ -1,0 +1,17 @@
+{
+  "model_dir": "runs/ss_scaffold_v1",
+  "motif_pdb": "data/1H0T.pdb",
+  "motif_range": [
+    0,
+    58
+  ],
+  "motif_ss": "CCCCCHHHHHHHHHHHHHCCCCCHHHHHHHHHHHHHCHHHHHHHHHHHHHHHHHHCCC",
+  "flank_ss": "C",
+  "motif_class_override": null,
+  "motif_target": [
+    0,
+    58
+  ],
+  "total_length": 100,
+  "n_samples": 4
+}
