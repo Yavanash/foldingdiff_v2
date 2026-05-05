@@ -26,16 +26,21 @@ import argparse
 import json
 import logging
 import os
+import pathlib
+import platform
 from pathlib import Path
-from typing import Tuple
+from typing import Optional, Tuple
 
 import numpy as np
 import pandas as pd
 import torch
+from huggingface_hub import snapshot_download
+from transformers import BertConfig
 
 from foldingdiff import angles_and_coords as ac
 from foldingdiff import beta_schedules, utils
 from foldingdiff.angles_and_coords import canonical_distances_and_dihedrals
+from foldingdiff.datasets import FEATURE_SET_NAMES_TO_ANGULARITY
 
 from ss_scaffold.model import BertForSSConditionedDiffusion
 from ss_scaffold.sampling import p_sample_loop_with_motif
@@ -49,6 +54,73 @@ from ss_scaffold.ss_labels import (
 # Match the model's default schema (canonical-full-angles).
 ANGLE_NAMES = ["phi", "psi", "omega", "tau", "CA:C:1N", "C:1N:1CA"]
 IS_ANGLE = [True] * 6
+
+HF_REPO = "Yavanash/ss-scaffold-v2"
+_LOCAL_SNAPSHOT_DIR = "model_cache/ss_scaffold_v2"
+
+
+def _download_snapshot() -> Tuple[str, str]:
+    """Pull the trained ss_scaffold checkpoint + configs from HF.
+
+    Layout expected on the hub:
+        <repo>/ss_scaffold_v2/    — training_args.json, config.json,
+                                    training_means.npy, checkpoints/last.ckpt
+        <repo>/config_jsons/      — auxiliary configs
+    """
+    logging.info(f"Downloading snapshot: {HF_REPO}")
+    snapshot_root = snapshot_download(
+        repo_id=HF_REPO,
+        ignore_patterns=["*.msgpack", "*.h5", "flax_model*"],
+        local_dir=_LOCAL_SNAPSHOT_DIR,
+    )
+    logging.info(f"Snapshot cached at: {snapshot_root}")
+
+    model_dir = os.path.join(snapshot_root, "ss_scaffold_v2")
+    config_dir = os.path.join(snapshot_root, "config_jsons")
+    if not os.path.isdir(model_dir):
+        raise FileNotFoundError(f"Expected 'ss_scaffold_v2/' in snapshot, not found at {model_dir}")
+    if not os.path.isdir(config_dir):
+        raise FileNotFoundError(f"Expected 'config_jsons/' in snapshot, not found at {config_dir}")
+    return model_dir, config_dir
+
+
+def _load_model(
+    model_dir: str,
+    checkpoint: Optional[str],
+    device: str,
+) -> BertForSSConditionedDiffusion:
+    """Build BertForSSConditionedDiffusion from a snapshot dir and load weights."""
+    with open(os.path.join(model_dir, "training_args.json")) as f:
+        train_args = json.load(f)
+
+    config = BertConfig.from_json_file(os.path.join(model_dir, "config.json"))
+    ft_is_angular = FEATURE_SET_NAMES_TO_ANGULARITY[train_args["angles_definitions"]]
+    time_encoding_key = "time_encoding" if "time_encoding" in train_args else "seq_len_encoding"
+
+    model = BertForSSConditionedDiffusion(
+        config=config,
+        ft_is_angular=ft_is_angular,
+        time_encoding=train_args[time_encoding_key],
+        decoder=train_args["decoder"],
+    )
+
+    ckpt_path = checkpoint or os.path.join(model_dir, "checkpoints", "last.ckpt")
+    logging.info(f"Loading weights from: {ckpt_path}")
+
+    # Lightning checkpoints saved on Linux pickle PosixPath; loading on Windows
+    # needs PosixPath aliased to WindowsPath for the duration of torch.load.
+    if platform.system() == "Windows":
+        _orig = pathlib.PosixPath
+        pathlib.PosixPath = pathlib.WindowsPath  # type: ignore[assignment]
+        try:
+            state = torch.load(ckpt_path, map_location="cpu")
+        finally:
+            pathlib.PosixPath = _orig  # type: ignore[assignment]
+    else:
+        state = torch.load(ckpt_path, map_location="cpu")
+
+    model.load_state_dict(state["state_dict"], strict=False)
+    return model.to(device).eval()
 
 
 def _parse_range(s: str) -> Tuple[int, int]:
@@ -118,7 +190,9 @@ def _full_pdb_residue_count(pdb_path: str) -> int:
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--model-dir", required=True, help="Dir saved by training (config.json + checkpoint).")
+    p.add_argument("--model-dir", default=None,
+                   help=f"Local dir with config.json + checkpoint. If omitted, "
+                        f"the snapshot is pulled from HF repo {HF_REPO!r}.")
     p.add_argument("--checkpoint", default=None, help="Specific .ckpt path; else use model-dir/checkpoints/last.ckpt")
     p.add_argument("--motif-pdb", required=True)
     p.add_argument("--motif-range", default=None,
@@ -165,7 +239,12 @@ def main():
     logging.info(f"Extracting motif from {args.motif_pdb}: residues {motif_start_src}-{motif_end_src}")
     motif_angles_np = _extract_motif_angles(args.motif_pdb, motif_start_src, motif_end_src)
 
-    means_path = Path(args.model_dir) / "training_means.npy"
+    if args.model_dir is None:
+        model_dir, _config_dir = _download_snapshot()
+    else:
+        model_dir = args.model_dir
+
+    means_path = Path(model_dir) / "training_means.npy"
     if means_path.exists():
         training_means = np.load(means_path).astype(np.float32)
         assert training_means.shape == (len(ANGLE_NAMES),), (
@@ -204,11 +283,7 @@ def main():
             motif_ss = "C" * motif_len
 
     # Load model.
-    model = BertForSSConditionedDiffusion.from_dir(args.model_dir, load_weights=False)
-    ckpt_path = args.checkpoint or str(Path(args.model_dir) / "checkpoints" / "last.ckpt")
-    state = torch.load(ckpt_path, map_location="cpu")
-    model.load_state_dict(state["state_dict"], strict=False)
-    model = model.to(args.device).eval()
+    model = _load_model(model_dir, checkpoint=args.checkpoint, device=args.device)
 
     # Build per-sample inputs.
     L = args.total_length
@@ -256,7 +331,7 @@ def main():
 
     # Save per-sample CSV (angles) and reconstruct PDBs via NeRF.
     meta = {
-        "model_dir": args.model_dir,
+        "model_dir": args.model_dir or f"hf:{HF_REPO}",
         "motif_pdb": args.motif_pdb,
         "motif_range": [motif_start_src, motif_end_src],
         "motif_ss": motif_ss,
