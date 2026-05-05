@@ -54,8 +54,8 @@ If your file contains multiple models or alternative conformations, keep only th
 
 ```bash
 python -m ss_scaffold.sample \
-    --motif-pdb data/1H0T.pdb \
-    --motif-range 0-57 \
+    --motif-pdb data/4HB1.pdb \
+    --motif-range 10-30 \
     --total-length 80 \
     --motif-target-start 20 \
     --flank-ss C \
@@ -68,7 +68,7 @@ On first run the checkpoint and configs are pulled from `Yavanash/ss-scaffold-v2
 | Flag | Meaning |
 |---|---|
 | `--motif-pdb` | preprocessed PDB containing the motif to keep |
-| `--motif-range` | half-open, 0-indexed range (e.g. `0-57` = residues 1..58). Default: whole input |
+| `--motif-range` | half-open, 0-indexed range (e.g. `10-30` = residues 11..31). Default: whole input |
 | `--motif-class` | optional SS override (`H`/`E`/`C`) for every motif residue. Default: per-residue DSSP |
 | `--flank-ss` | SS class for non-motif residues (`H`/`E`/`C`). Default `C` (loop-biased flanks) |
 | `--total-length` | length of the designed protein |
