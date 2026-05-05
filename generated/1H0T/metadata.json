@@ -1,0 +1,17 @@
+{
+  "model_dir": "hf:Yavanash/ss-scaffold-v2",
+  "motif_pdb": "data/1H0T.pdb",
+  "motif_range": [
+    0,
+    58
+  ],
+  "motif_ss": "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
+  "flank_ss": "C",
+  "motif_class_override": null,
+  "motif_target": [
+    0,
+    58
+  ],
+  "total_length": 80,
+  "n_samples": 8
+}
