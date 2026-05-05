@@ -235,7 +235,7 @@ Outputs: `per_sequence.csv`, `per_backbone.csv`, `summary.json`, `seqs/`, `folde
 
 @misc{ss_scaffold_bt305,
   title = {SS-Scaffold: secondary-structure-conditioned motif scaffolding on FoldingDiff},
-  author= {Singh Srayash, Vadali Yavansh},
+  author= {Singh Srayash, Vadali Yavanash},
   year  = {2026},
   note  = {BT305 course project (30 marks)}
 }
