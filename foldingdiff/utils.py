@@ -2,14 +2,66 @@
 Misc shared utility functions
 """
 import os
+import sys
 import glob
 import hashlib
 import logging
+import multiprocessing
 from typing import *
 
 import requests
 
 import numpy as np
+
+
+def get_device(prefer: Optional[str] = None):
+    """
+    Pick the best available torch device in a hardware/OS-agnostic way.
+
+    Order of preference: explicit `prefer` (if available) -> CUDA -> Apple MPS -> CPU.
+    Pass `prefer="cpu"` to force CPU. The string "auto" is treated as None.
+    """
+    import torch
+
+    if prefer in (None, "", "auto"):
+        if torch.cuda.is_available():
+            return torch.device("cuda:0")
+        if getattr(torch.backends, "mps", None) is not None and torch.backends.mps.is_available():
+            return torch.device("mps")
+        return torch.device("cpu")
+
+    dev = torch.device(prefer)
+    if dev.type == "cuda" and not torch.cuda.is_available():
+        logging.warning("CUDA requested but unavailable; falling back to CPU")
+        return torch.device("cpu")
+    if dev.type == "mps" and not (
+        getattr(torch.backends, "mps", None) is not None and torch.backends.mps.is_available()
+    ):
+        logging.warning("MPS requested but unavailable; falling back to CPU")
+        return torch.device("cpu")
+    return dev
+
+
+def get_num_workers(requested: Optional[int] = None) -> int:
+    """
+    Cross-OS safe DataLoader worker count.
+
+    Windows + macOS spawn-based multiprocessing can fail loading torch's
+    shared-memory DLL or recursively re-import the entry script when
+    num_workers > 0. Default to 0 there unless the caller forces otherwise
+    via the FOLDINGDIFF_WORKERS env var or an explicit argument.
+    """
+    env = os.environ.get("FOLDINGDIFF_WORKERS")
+    if env is not None:
+        try:
+            return max(0, int(env))
+        except ValueError:
+            pass
+    if requested is not None:
+        return max(0, int(requested))
+    if sys.platform.startswith("win"):
+        return 0
+    return max(1, multiprocessing.cpu_count())
 
 
 def is_huggingface_hub_id(s: str) -> bool:

@@ -135,20 +135,22 @@ def train(
     # https://pytorch-lightning.readthedocs.io/en/1.4.0/advanced/multi_gpu.html#batch-size
     # Under DDP, effective batch size is batch_size * num_gpus * num_nodes
     effective_batch_size = batch_size
-    if torch.cuda.is_available():
-        effective_batch_size = int(batch_size / torch.cuda.device_count())
+    n_gpus = torch.cuda.device_count() if torch.cuda.is_available() else 0
+    if n_gpus > 0:
+        effective_batch_size = int(batch_size / n_gpus)
     pl.utilities.rank_zero_info(
-        f"Given batch size: {batch_size} --> effective batch size with {torch.cuda.device_count()} GPUs: {effective_batch_size}"
+        f"Given batch size: {batch_size} --> effective batch size with {n_gpus} GPUs: {effective_batch_size}"
     )
 
     # Create data loaders
+    n_workers = utils.get_num_workers()
     train_dataloader, valid_dataloader, test_dataloader = [
         DataLoader(
             dataset=ds,
             batch_size=effective_batch_size,
             shuffle=i == 0,  # Shuffle only train loader
-            num_workers=multiprocessing.cpu_count(),
-            pin_memory=True,
+            num_workers=n_workers,
+            pin_memory=torch.cuda.is_available(),
         )
         for i, ds in enumerate(dsets)
     ]
@@ -194,13 +196,20 @@ def train(
         outdir=results_folder, early_stop_patience=early_stop_patience, swa=use_swa
     )
 
-    # Get accelerator and distributed strategy
-    accelerator, strategy = "cpu", None
+    # Get accelerator and distributed strategy in a hardware-agnostic way
+    accelerator, strategy, devices = "cpu", None, 1
     if torch.cuda.is_available():
         accelerator = "cuda"
+        devices = torch.cuda.device_count()
         if torch.cuda.device_count() > 1:
-            # https://github.com/Lightning-AI/lightning/discussions/6761https://github.com/Lightning-AI/lightning/discussions/6761
+            # https://github.com/Lightning-AI/lightning/discussions/6761
             strategy = DDPStrategy(find_unused_parameters=False)
+    elif (
+        getattr(torch.backends, "mps", None) is not None
+        and torch.backends.mps.is_available()
+    ):
+        accelerator = "mps"
+        devices = 1
 
     logging.info(f"Using {accelerator} with strategy {strategy}")
     trainer = pl.Trainer(
@@ -214,7 +223,7 @@ def train(
         log_every_n_steps=min(200, len(train_dataloader)),  # Log >= once per epoch
         accelerator=accelerator,
         strategy=strategy,
-        gpus=torch.cuda.device_count() if torch.cuda.is_available() else None,
+        devices=devices,
         enable_progress_bar=False,
         move_metrics_to_cpu=False,  # Saves memory
     )
@@ -275,6 +284,8 @@ def main():
 
 
 if __name__ == "__main__":
+    # Required on Windows / macOS spawn-based multiprocessing
+    multiprocessing.freeze_support()
     curr_time = datetime.now().strftime("%y%m%d_%H%M%S")
     logging.basicConfig(
         level=logging.INFO,

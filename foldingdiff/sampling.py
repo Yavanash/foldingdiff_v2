@@ -239,8 +239,7 @@ def sample_simple(
         training_args = json.load(source)
 
     model = modelling.BertForDiffusionBase.from_dir(model_dir)
-    if torch.cuda.is_available():
-        model = model.to("cuda:0")
+    model = model.to(utils.get_device())
 
     dummy_dset = dsets.AnglesEmptyDataset.from_dir(model_dir)
     dummy_noised_dset = dsets.NoisedAnglesDataset(

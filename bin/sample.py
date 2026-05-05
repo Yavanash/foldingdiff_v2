@@ -284,7 +284,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--nopsea", action="store_true", help="Skip PSEA calculations")
     parser.add_argument("--seed", type=int, default=SEED, help="Random seed")
-    parser.add_argument("--device", type=str, default="cuda:0", help="Device to use")
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="auto",
+        help="Device to use: 'auto' (default), 'cuda', 'cuda:N', 'mps', or 'cpu'",
+    )
     return parser
 
 
@@ -341,7 +346,7 @@ def main() -> None:
     model_snapshot_dir = outdir / "model_snapshot"
     model = modelling.BertForDiffusionBase.from_dir(
         args.model, copy_to=model_snapshot_dir
-    ).to(torch.device(args.device))
+    ).to(utils.get_device(args.device))
 
     # Checks
     sweep_min_len, sweep_max_len = args.lengths

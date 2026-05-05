@@ -69,7 +69,13 @@ def build_parser():
     parser.add_argument(
         "-m", "--model", default="wukevin/foldingdiff_cath", help="Model to use"
     )
-    parser.add_argument("-d", "--device", type=int, default=1, help="GPU to use")
+    parser.add_argument(
+        "-d",
+        "--device",
+        type=str,
+        default="auto",
+        help="Device to use: 'auto', 'cuda', 'cuda:N', 'mps', or 'cpu'",
+    )
     return parser
 
 
@@ -77,9 +83,10 @@ def get_reconstruction_error(
     pdb_files: Collection[str],
     timesteps: int = 800,
     model: str = "wukevin/foldingdiff_cath",
-    device: torch.device = torch.device("cuda:1"),
+    device: Union[str, torch.device, None] = None,
 ) -> np.ndarray:
     """Get the reconstruction error for a set of PDB files"""
+    device = utils.get_device(device if isinstance(device, str) or device is None else str(device))
     if utils.is_huggingface_hub_id(model):
         logging.info(f"Detected huggingface repo ID {model}")
         dl_path = snapshot_download(model)  # Caching is automatic
@@ -94,7 +101,7 @@ def get_reconstruction_error(
     dset = load_dataset(pdb_files, model)
 
     # Load in model
-    model = modelling.BertForDiffusionBase.from_dir(model).to(torch.device(device))
+    model = modelling.BertForDiffusionBase.from_dir(model).to(device)
 
     # Run the partial denoising
     scores_wrt_coords, _scores_wrt_angles = sampling.get_reconstruction_error(
@@ -117,7 +124,7 @@ def main():
         args.pdb_files,
         timesteps=args.timesteps,
         model=args.model,
-        device=torch.device(f"cuda:{args.device}"),
+        device=args.device,
     )
 
     scores_dict = {pdb: score for pdb, score in zip(args.pdb_files, scores)}

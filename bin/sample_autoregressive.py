@@ -85,8 +85,8 @@ def build_parser():
         "-d",
         "--device",
         type=str,
-        default="cuda:0",
-        help="Device to run generations on",
+        default="auto",
+        help="Device to run generations on: 'auto', 'cuda', 'cuda:N', 'mps', or 'cpu'",
     )
     return parser
 
@@ -105,7 +105,7 @@ def main() -> None:
     assert not os.listdir(outdir), f"Expected {outdir} to be empty"
 
     # Load the model
-    device = torch.device(args.device)
+    device = utils.get_device(args.device)
     m = modelling.BertForAutoregressive.from_dir(
         args.model, copy_to=Path(outdir) / "model_snapshot"
     ).to(device)

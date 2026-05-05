@@ -354,7 +354,8 @@ class BertForDiffusionBase(BertPreTrainedModel):
                 )
             else:
                 retval = cls(**model_args)
-                loaded = torch.load(ckpt_name, map_location=torch.device("cuda"))
+                from foldingdiff.utils import get_device
+                loaded = torch.load(ckpt_name, map_location=get_device())
                 retval.load_state_dict(loaded["state_dict"])
         else:
             retval = cls(**model_args)
