@@ -1,5 +1,4 @@
-data/
-results/
+model_cache/
 training*
 lib/
 lib64/
@@ -8,20 +7,6 @@ config_jsons/
 .ipynb_checkpoints
 foldingdiff/cache_canonical_structures_cath_d3565295b6bd304c8ecc27c1f34bc194.pkl
 .pkl
-runs/
-generated/
-data/
-results/
-training*
-lib/
-lib64/
-__pycache__/
-config_jsons/
-.ipynb_checkpoints
-foldingdiff/cache_canonical_structures_cath_d3565295b6bd304c8ecc27c1f34bc194.pkl
-.pkl
-runs/
-generated/
 key
 key.pub
 checking/
